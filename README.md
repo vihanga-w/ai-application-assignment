@@ -14,7 +14,7 @@ It ships with:
 - A simple browser-based chat UI
 - Real-time progress updates while research is running
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/llm-chat-app-template)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/vihanga-w/ai-application-assignment)
 
 > ⚠️ This template is opinionated towards **fact-checking** and **research-style responses**, not generic chat.
 
