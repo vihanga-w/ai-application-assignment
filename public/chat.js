@@ -1,158 +1,256 @@
-/**
- * LLM Chat App Frontend
- *
- * Handles the chat UI interactions and communication with the backend API.
- */
+// chat.js
 
-// DOM elements
-const chatMessages = document.getElementById("chat-messages");
-const userInput = document.getElementById("user-input");
-const sendButton = document.getElementById("send-button");
-const typingIndicator = document.getElementById("typing-indicator");
+(function () {
+  const chatMessagesEl = document.getElementById("chat-messages");
+  const typingIndicatorEl = document.getElementById("typing-indicator");
+  const userInputEl = document.getElementById("user-input");
+  const sendButtonEl = document.getElementById("send-button");
 
-// Chat state
-let chatHistory = [
-  {
-    role: "assistant",
-    content:
-      "Hello! I'm an LLM chat app powered by Cloudflare Workers AI. How can I help you today?",
-  },
-];
-let isProcessing = false;
+  let socket = null;
+  let socketReadyPromise = null;
+  let isBusy = false;
 
-// Auto-resize textarea as user types
-userInput.addEventListener("input", function () {
-  this.style.height = "auto";
-  this.style.height = this.scrollHeight + "px";
-});
-
-// Send message on Enter (without Shift)
-userInput.addEventListener("keydown", function (e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
+  function scrollToBottom() {
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
   }
-});
 
-// Send button click handler
-sendButton.addEventListener("click", sendMessage);
-
-/**
- * Sends a message to the chat API and processes the response
- */
-async function sendMessage() {
-  const message = userInput.value.trim();
-
-  // Don't send empty messages
-  if (message === "" || isProcessing) return;
-
-  // Disable input while processing
-  isProcessing = true;
-  userInput.disabled = true;
-  sendButton.disabled = true;
-
-  // Add user message to chat
-  addMessageToChat("user", message);
-
-  // Clear input
-  userInput.value = "";
-  userInput.style.height = "auto";
-
-  // Show typing indicator
-  typingIndicator.classList.add("visible");
-
-  // Add message to history
-  chatHistory.push({ role: "user", content: message });
-
-  try {
-    // Create new assistant response element
-    const assistantMessageEl = document.createElement("div");
-    assistantMessageEl.className = "message assistant-message";
-    assistantMessageEl.innerHTML = "<p></p>";
-    chatMessages.appendChild(assistantMessageEl);
-
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    // Send request to API
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messages: chatHistory,
-      }),
-    });
-
-    // Handle errors
-    if (!response.ok) {
-      throw new Error("Failed to get response");
+  function createMessageElement(role, text) {
+    const msgEl = document.createElement("div");
+    msgEl.classList.add("message");
+    if (role === "user") {
+      msgEl.classList.add("user-message");
+    } else {
+      msgEl.classList.add("assistant-message");
     }
 
-    // Process streaming response
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let responseText = "";
+    // Meta
+    const metaEl = document.createElement("div");
+    metaEl.classList.add("message-meta");
 
-    while (true) {
-      const { done, value } = await reader.read();
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = role === "user" ? "You" : "Fact Checker";
 
-      if (done) {
+    const dot = document.createElement("div");
+    dot.classList.add("meta-dot");
+
+    const sideSpan = document.createElement("span");
+    sideSpan.textContent = role === "user" ? "Input" : "Response";
+
+    metaEl.appendChild(nameSpan);
+    metaEl.appendChild(dot);
+    metaEl.appendChild(sideSpan);
+
+    msgEl.appendChild(metaEl);
+
+    // Content – split by double newline into paragraphs
+    const paragraphs = String(text).split(/\n{2,}/);
+    paragraphs.forEach((para, idx) => {
+      if (!para.trim()) return;
+      const p = document.createElement("p");
+      p.textContent = para.trim();
+      if (idx > 0) p.style.marginTop = "0.35rem";
+      msgEl.appendChild(p);
+    });
+
+    return msgEl;
+  }
+
+  function addMessage(role, text) {
+    const msgEl = createMessageElement(role, text);
+    chatMessagesEl.appendChild(msgEl);
+    scrollToBottom();
+    return msgEl;
+  }
+
+  function setTypingIndicator(visible, text) {
+    if (text) {
+      typingIndicatorEl.textContent = text;
+    }
+    typingIndicatorEl.classList.toggle("visible", visible);
+  }
+
+  function setBusyState(busy) {
+    isBusy = busy;
+    sendButtonEl.disabled = busy;
+    userInputEl.disabled = busy;
+    setTypingIndicator(busy, busy
+      ? "Analyzing information and searching for evidence..."
+      : "Analyzing information and searching for evidence..."
+    );
+  }
+
+  function connectWebSocket() {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/chat`;
+
+    socket = new WebSocket(wsUrl);
+
+    socketReadyPromise = new Promise((resolve, reject) => {
+      socket.onopen = () => {
+        resolve(socket);
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        reject(err);
+      };
+    });
+
+    socket.onmessage = (event) => {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch (e) {
+        console.warn("Non-JSON WebSocket message:", event.data);
+        return;
+      }
+
+      handleServerMessage(msg);
+    };
+
+    socket.onclose = (event) => {
+      console.log("WebSocket closed:", event.code, event.reason);
+      if (isBusy) {
+        setBusyState(false);
+        addMessage(
+          "assistant",
+          "The connection was interrupted while fact-checking. Please try again."
+        );
+      }
+    };
+  }
+
+  function ensureSocketOpen() {
+    if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+      connectWebSocket();
+    }
+    return socketReadyPromise;
+  }
+
+  function handleServerMessage(msg) {
+    switch (msg.type) {
+      case "status": {
+        const stage = msg.stage || "";
+        if (stage === "query_generation") {
+          setTypingIndicator(true, "Generating search queries...");
+        } else if (stage === "research") {
+          setTypingIndicator(true, "Searching the web and collecting evidence...");
+        } else if (stage === "final_answer") {
+          setTypingIndicator(true, "Analysing evidence and writing the final assessment...");
+        }
         break;
       }
 
-      // Decode chunk
-      const chunk = decoder.decode(value, { stream: true });
-
-      // Process SSE format
-      const lines = chunk.split("\n");
-      for (const line of lines) {
-        try {
-          const jsonData = JSON.parse(line);
-          if (jsonData.response) {
-            // Append new content to existing text
-            responseText += jsonData.response;
-            assistantMessageEl.querySelector("p").textContent = responseText;
-
-            // Scroll to bottom
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-          }
-        } catch (e) {
-          console.error("Error parsing JSON:", e);
+      case "queries": {
+        const queries = msg.data || [];
+        if (queries.length > 0) {
+          const text =
+            "I'll research these queries to verify your claim:\n\n" +
+            queries.map((q, i) => `${i + 1}. ${q.query}`).join("\n");
+          addMessage("assistant", text);
         }
+        break;
       }
+
+      case "progress": {
+        const { stage, queryIndex, totalQueries, query } = msg;
+        const stageText =
+          stage === "search"
+            ? "Searching"
+            : stage === "page_extracted"
+            ? "Extracted page text for"
+            : "Working on";
+        setTypingIndicator(
+          true,
+          `${stageText} query ${queryIndex} of ${totalQueries}: "${query}"`
+        );
+        break;
+      }
+
+      case "final": {
+        setBusyState(false);
+        setTypingIndicator(false);
+        const answer = msg.answer || "I wasn't able to generate a response.";
+        addMessage("assistant", answer);
+        break;
+      }
+
+      case "error": {
+        setBusyState(false);
+        setTypingIndicator(false);
+        const message =
+          msg.message || "Something went wrong while fact-checking your input.";
+        addMessage("assistant", `Error: ${message}`);
+        break;
+      }
+
+      default:
+        console.log("Unknown message type from server:", msg);
     }
-
-    // Add completed response to chat history
-    chatHistory.push({ role: "assistant", content: responseText });
-  } catch (error) {
-    console.error("Error:", error);
-    addMessageToChat(
-      "assistant",
-      "Sorry, there was an error processing your request.",
-    );
-  } finally {
-    // Hide typing indicator
-    typingIndicator.classList.remove("visible");
-
-    // Re-enable input
-    isProcessing = false;
-    userInput.disabled = false;
-    sendButton.disabled = false;
-    userInput.focus();
   }
-}
 
-/**
- * Helper function to add message to chat
- */
-function addMessageToChat(role, content) {
-  const messageEl = document.createElement("div");
-  messageEl.className = `message ${role}-message`;
-  messageEl.innerHTML = `<p>${content}</p>`;
-  chatMessages.appendChild(messageEl);
+  async function sendUserMessage() {
+    if (isBusy) return;
 
-  // Scroll to bottom
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
+    const content = userInputEl.value.trim();
+    if (!content) return;
+
+    // Add user message to UI
+    addMessage("user", content);
+    userInputEl.value = "";
+    autoResizeTextarea();
+
+    setBusyState(true);
+    setTypingIndicator(true, "Generating search queries...");
+
+    try {
+      await ensureSocketOpen();
+      const payload = {
+        messages: [
+          {
+            role: "user",
+            content,
+          },
+        ],
+      };
+      socket.send(JSON.stringify(payload));
+    } catch (err) {
+      console.error("Failed to send over WebSocket:", err);
+      setBusyState(false);
+      setTypingIndicator(false);
+      addMessage(
+        "assistant",
+        "I couldn't connect to the server to fact-check your input. Please try again."
+      );
+    }
+  }
+
+  function autoResizeTextarea() {
+    userInputEl.style.height = "auto";
+    const maxHeight = 120;
+    const newHeight = Math.min(userInputEl.scrollHeight, maxHeight);
+    userInputEl.style.height = newHeight + "px";
+  }
+
+  // Event listeners
+  sendButtonEl.addEventListener("click", (e) => {
+    e.preventDefault();
+    sendUserMessage();
+  });
+
+  userInputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendUserMessage();
+    }
+  });
+
+  userInputEl.addEventListener("input", autoResizeTextarea);
+
+  // Initialise
+  connectWebSocket();
+})();
