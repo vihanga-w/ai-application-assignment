@@ -24,11 +24,11 @@ It ships with:
 
 This template shows how to build a **fact-checking chat interface** with:
 
-- 🔍 Automatic generation of 4–6 search queries from user input
-- 🌐 Live web search via SerpAPI (including Google AI Overview HTML)
-- 🧹 HTML → text extraction and cleanup
-- 🧠 Second-pass LLM call that reads the collected evidence and evaluates the accuracy of the original statement
-- 📡 WebSocket-based status + progress messages (e.g. query generation, search, page extraction, final answer)
+- Automatic generation of 4–6 search queries from user input
+- Live web search via SerpAPI (including Google AI Overview HTML)
+- HTML → text extraction and cleanup
+- Second-pass LLM call that reads the collected evidence and evaluates the accuracy of the original statement
+- WebSocket-based status + progress messages (e.g. query generation, search, page extraction, final answer)
 
 The frontend provides:
 
@@ -40,14 +40,14 @@ The frontend provides:
 
 ## Features
 
-- 💬 Fact-checking–oriented chat flow
-- ⚡ WebSocket-based pipeline with granular status events
-- 🔁 HTTP `/api/chat` endpoint for non-WebSocket usage
-- 🧠 Powered by Cloudflare Workers AI LLMs
-- 🌐 Deep integration with SerpAPI (Google search + AI overview pages)
-- ✨ Opinionated system prompt for query generation
-- 📱 Responsive UI (works on mobile and desktop)
-- 🧪 Built with TypeScript and Cloudflare Workers
+- Fact-checking–oriented chat flow
+- WebSocket-based pipeline with granular status events
+- HTTP `/api/chat` endpoint for non-WebSocket usage
+- Powered by Cloudflare Workers AI LLMs
+- Deep integration with SerpAPI (Google search + AI overview pages)
+- Opinionated system prompt for query generation
+- Responsive UI (works on mobile and desktop)
+- Built with TypeScript and Cloudflare Workers
 
 ---
 
