@@ -1,4 +1,4 @@
-# LLM Fact-Checking Chat Template
+# LLM Fact-Checking Chat App
 
 This project is a fact-checking–focused chat application built on top of **Cloudflare Workers AI** and **SerpAPI**.  
 Instead of just answering questions, it:
