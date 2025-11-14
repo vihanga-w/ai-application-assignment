@@ -16,17 +16,17 @@ It ships with:
 
 [Try it out](https://ai-application-assignment.workerscosmos.workers.dev/)
 
-> ⚠️ This template is opinionated towards **fact-checking** and **research-style responses**, not generic chat.
+> ⚠️ This chatbot is targetted towards **fact-checking** and **research-style responses**, not generic chat.
 
 ---
 
 ## Demo / What It Does
 
-This template shows how to build a **fact-checking chat interface** with:
+This project is a **fact-checking chat interface** with:
 
 - Automatic generation of 4–6 search queries from user input
 - Live web search via SerpAPI (including Google AI Overview HTML)
-- HTML → text extraction and cleanup
+- HTML --> text extraction and cleanup
 - Second-pass LLM call that reads the collected evidence and evaluates the accuracy of the original statement
 - WebSocket-based status + progress messages (e.g. query generation, search, page extraction, final answer)
 
@@ -58,3 +58,6 @@ The frontend provides:
 - [Node.js](https://nodejs.org/) **v20 or newer**
 - A [Cloudflare](https://dash.cloudflare.com/) account with **Workers** and **Workers AI** enabled
 - A [SerpAPI](https://serpapi.com/) API key
+
+### Note
+There is a SerpAPI key included, it is recommended to change this if you choose to clone the project as it is on the free tier.
